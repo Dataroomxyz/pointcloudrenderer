@@ -1,0 +1,13 @@
+{
+  "name": "com.storylabresearch.pointcloudrenderer",
+  "version": "0.0.1",
+  "displayName": "StoryLabResearch PointCloud Renderer",
+  "description": "Importer, chunker and LOD generator with PCX-based importing and rendering mechanisms for PLY pointcloud files",
+  "unity": "2022.3",
+  "unityRelease": "5f1",
+  "author": {
+    "name": "Chris Nightingale",
+    "email": "StoryLab@aru.ac.uk",
+    "url": "storylabresearch.com"
+  }
+}
