@@ -21,6 +21,8 @@ Only supports URP for now. There is no technical reason why BRP cannot be suppor
 
 Point Clouds are rendered using geometry shaders on platforms which support them, or will otherwise fall back on the rendering API's default points mechanism, which may or may not respect the point size (DX11 will never render more than one pixel, OpenGL will always render the point as a sized quad).
 
+This package was developed in Unity 2022.3.5f1 LTS and URP 14.0.8, and has not been tested on other versions.
+
 # Installation
 Install via the package manager.
 
