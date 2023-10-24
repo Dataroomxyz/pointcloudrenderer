@@ -17,7 +17,6 @@ namespace StoryLabResearch.PointCloud
 
         SerializedProperty _subsample;
         SerializedProperty _initialSubsampleFactor;
-        SerializedProperty _compensateArea;
 
         SerializedProperty _materialMode;
         SerializedProperty _customMaterialOverride;
@@ -44,7 +43,6 @@ namespace StoryLabResearch.PointCloud
 
             _subsample = serializedObject.FindProperty(nameof(PlyImporter.Subsample));
             _initialSubsampleFactor = serializedObject.FindProperty(nameof(PlyImporter.SubsampleFactor));
-            _compensateArea = serializedObject.FindProperty(nameof(PlyImporter.CompensateArea));
 
             _materialMode = serializedObject.FindProperty(nameof(PlyImporter.MaterialMode));
             _customMaterialOverride = serializedObject.FindProperty(nameof(PlyImporter.CustomMaterialOverride));
@@ -71,11 +69,7 @@ namespace StoryLabResearch.PointCloud
             if (_containerType.intValue == (int)PlyImporter.EAssetContainerType.PointMesh)
             {
                 EditorGUILayout.PropertyField(_subsample);
-                if (_subsample.boolValue)
-                {
-                    _initialSubsampleFactor.floatValue = EditorGUILayout.Slider(_initialSubsampleFactor.displayName, _initialSubsampleFactor.floatValue, 0f, 1f);
-                    EditorGUILayout.PropertyField(_compensateArea);
-                }
+                if (_subsample.boolValue) _initialSubsampleFactor.floatValue = EditorGUILayout.Slider(_initialSubsampleFactor.displayName, _initialSubsampleFactor.floatValue, 0f, 1f);
 
                 EditorGUILayout.Space();
 
@@ -97,7 +91,7 @@ namespace StoryLabResearch.PointCloud
                 switch(_materialMode.intValue)
                 {
                     case (int)PlyImporter.EMaterialMode.Unique:
-                        EditorGUILayout.HelpBox("Create a unique material for this asset.\r\n\r\nExtract the unique material to edit its properties.", MessageType.Info);
+                        EditorGUILayout.HelpBox("Create a unique material for this asset.\r\n\r\nBy default the material will be extracted to allow you to edit its properties. The extracted material will not be destroyed if you choose later not to extract it.", MessageType.Info);
                         EditorGUILayout.PropertyField(_extractUniqueMaterial);
                         break;
                     case (int)PlyImporter.EMaterialMode.Custom:

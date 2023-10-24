@@ -10,13 +10,12 @@ Shader "Hidden/StoryLab PointCloud/URP_Point"
 {
     Properties
     {
-        _PointSize("Point Size", Float) = 0.01
-        [Toggle(SOLID_COLOR)] _SolidColor("Solid Color", Float) = 0
-        [Toggle(DEBUG)] _Debug("Debug Crossfade", Float) = 0
+        _PointSize("Point Size", Float) = 0.02
+        [KeywordEnum(Vertex, Solid, Blend)] _ColorMode("Color Mode", int) = 0
         _Color("Color", Color) = (1,1,1,1)
         _ColorBlend("Color Blend", Range(0,1)) = 0
-        _ColorMultiplier("Color Multiplier", Float) = 1
         // note to self: Even if we are using solid color, we still need to pass the color data through because the shader uses the alpha for scale
+        [Toggle(DEBUG)] _Debug("Debug Crossfade", Float) = 0
     }
     SubShader
     {
@@ -115,10 +114,14 @@ Shader "Hidden/StoryLab PointCloud/URP_Point"
                 #if LOD_FADE_CROSSFADE && DEBUG
                     return half3(1, 1, 0);
                 #else
-                    #if SOLID_COLOR
+                    #if _COLORMODE_SOLID
                         return _Color;
                     #else
-                        half3 outColor = ((1 - _ColorBlend) * m.color.rgb) + (_ColorBlend * _Color);
+                        #if _COLORMODE_BLEND
+                            half3 outColor = ((1 - _ColorBlend) * m.color.rgb) + (_ColorBlend * _Color.rgb);
+                        #else
+                            half3 outColor = m.color.rgb;
+                        #endif
                         #ifdef UNITY_COLORSPACE_GAMMA
                             #if FOG_LINEAR || FOG_EXP || FOG_EXP2
                                 return MixFog(outColor, m.fogCoords);
@@ -186,4 +189,6 @@ Shader "Hidden/StoryLab PointCloud/URP_Point"
             ENDHLSL
         }
     }
+    CustomEditor "StoryLabResearch.PointCloud.PointCloudShaderGUI"
+
 }

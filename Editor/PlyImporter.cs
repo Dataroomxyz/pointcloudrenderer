@@ -44,11 +44,10 @@ namespace StoryLabResearch.PointCloud
 
         public bool Subsample = false;
         [Range(0f, 1f)] public float SubsampleFactor = 1f;
-        public bool CompensateArea = false;
 
         public EMaterialMode MaterialMode = EMaterialMode.Unique;
         public Material CustomMaterialOverride;
-        public bool ExtractUniqueMaterial = false;
+        public bool ExtractUniqueMaterial = true;
 
         public bool GenerateLODs = true;
         public bool CrossFadeLODs = true;
@@ -111,7 +110,7 @@ namespace StoryLabResearch.PointCloud
         private Mesh GetPlyMesh(AssetImportContext context)
         {
             var plyMesh = ReadDataAsMesh(context.assetPath, false);
-            if (Subsample && SubsampleFactor < 1f) plyMesh = PointMeshSubsampler.SubsampleMesh(plyMesh, SubsampleFactor, "", CompensateArea);
+            if (Subsample && SubsampleFactor < 1f) plyMesh = PointMeshSubsampler.SubsampleMesh(plyMesh, SubsampleFactor);
             return plyMesh;
         }
 
@@ -234,7 +233,7 @@ namespace StoryLabResearch.PointCloud
 
         private LOD CreateAddAndReturnLODMeshObject(AssetImportContext context, GameObject gameObject, Mesh originalMesh, LODDescription description, Material material, string suffix = "")
         {
-            Mesh subsampledMesh = PointMeshSubsampler.SubsampleMesh(originalMesh, description.subsampleFactor, suffix, description.compensateArea);
+            Mesh subsampledMesh = PointMeshSubsampler.SubsampleMesh(originalMesh, description.subsampleFactor, suffix);
             context.AddObjectToAsset(subsampledMesh.name, subsampledMesh);
 
             var subGameObject = new GameObject();

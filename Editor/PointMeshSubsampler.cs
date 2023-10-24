@@ -6,19 +6,13 @@ namespace StoryLabResearch.PointCloud
 {
     public class PointMeshSubsampler
     {
-        public enum SubsampleMode
-        {
-            ByIndex,
-            PoissonDisk
-        }
-
         public static Mesh SubsampleMesh(Mesh originalMesh, float subsampleFactor, string suffix = "", bool compensateArea = true)
         {
             var originalVertices = originalMesh.vertices;
             var originalColors32 = originalMesh.colors32;
             int step = Mathf.RoundToInt(1 / Mathf.Clamp01(subsampleFactor));
             int outputVertexCount = originalMesh.vertexCount / step;
-            float areaCompensation = compensateArea ? 1 / subsampleFactor : 1f;
+            float areaCompensation = compensateArea ? 1f / subsampleFactor : 1f;
             byte radiusCompensation = (byte)Mathf.RoundToInt(10 * Mathf.Sqrt(areaCompensation));
 
             var vertices = new Vector3[outputVertexCount];

@@ -10,8 +10,8 @@ Shader "StoryLab PointCloud/URP"
 {
     Properties
     {
-        _PointSize("Point Size", Float) = 0.01
-        [Toggle(SOLID_COLOR)] _SolidColor("Solid Color", Float) = 0
+        _PointSize("Point Size", Float) = 0.02
+        [KeywordEnum(Vertex, Solid, Blend)] _ColorMode("Color Mode", int) = 0
         _Color("Color", Color) = (1,1,1,1)
         _ColorBlend("Color Blend", Range(0,1)) = 0
         // note to self: Even if we are using solid color, we still need to pass the color data through because the shader uses the alpha for scale
@@ -159,10 +159,14 @@ Shader "StoryLab PointCloud/URP"
                 #if LOD_FADE_CROSSFADE && DEBUG
                     return half3(1, 1, 0);
                 #else
-                    #if SOLID_COLOR
+                    #if _COLORMODE_SOLID
                         return _Color;
                     #else
-                        half3 outColor = ((1 - _ColorBlend) * m.color.rgb) + (_ColorBlend * _Color.rgb);
+                        #if _COLORMODE_BLEND
+                            half3 outColor = ((1 - _ColorBlend) * m.color.rgb) + (_ColorBlend * _Color.rgb);
+                        #else
+                            half3 outColor = m.color.rgb;
+                        #endif
                         #ifdef UNITY_COLORSPACE_GAMMA
                             #if FOG_LINEAR || FOG_EXP || FOG_EXP2
                                 return MixFog(outColor, m.fogCoords);
@@ -203,7 +207,7 @@ Shader "StoryLab PointCloud/URP"
                 #pragma multi_compile_fog
                 #pragma multi_compile _ UNITY_COLORSPACE_GAMMA
                 #pragma multi_compile_instancing
-                #pragma multi_compile _ SOLID_COLOR
+                #pragma shader_feature _COLORMODE_VERTEX _COLORMODE_SOLID _COLORMODE_BLEND
                 #pragma multi_compile _ LOD_FADE_CROSSFADE
                 #pragma multi_compile _ DEBUG
                 #pragma require geometry
@@ -238,4 +242,5 @@ Shader "StoryLab PointCloud/URP"
         }
     }
     Fallback "Hidden/StoryLab PointCloud/URP_Point"
+    CustomEditor "StoryLabResearch.PointCloud.PointCloudShaderGUI"
 }
