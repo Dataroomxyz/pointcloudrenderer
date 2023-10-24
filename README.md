@@ -21,6 +21,8 @@ Only supports URP for now. There is no technical reason why BRP cannot be suppor
 
 Point Clouds are rendered using geometry shaders on platforms which support them, or will otherwise fall back on the rendering API's default points mechanism, which may or may not respect the point size (DX11 will never render more than one pixel, OpenGL will always render the point as a sized quad).
 
+Only binary little-endian PLY files are supported.
+
 This package was developed in Unity 2022.3.5f1 LTS and URP 14.0.8, and has not been tested on other versions.
 
 # Installation
@@ -35,3 +37,6 @@ Enter the GitHub URL.
 Installation is complete, drag and drop your .PLY files into the project window.
 
 ![Picture3](https://github.com/StoryLab-Research-Institute/pointcloudrenderer/assets/114744494/6603104c-aaf1-489d-9046-187e78fe2d05)
+
+# Thanks
+The importing system is based on the PCX importer, used under the UnLicense: https://github.com/keijiro/Pcx 
