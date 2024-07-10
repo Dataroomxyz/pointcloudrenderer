@@ -114,14 +114,14 @@ Shader "StoryLab PointCloud/URP"
                 o.clipPos = vert;
                 o.color = input[0].color;
 
-                float radius = _PointSize * o.color.a * 12.75f;
+                float radius = _PointSize * o.color.a * 255 * 0.5f;
+                // color alpha (8-bit uint, 0-255, represented as float 0-1) is used as a size multipler
+
             #if LOD_FADE_CROSSFADE
                 radius *= GetEffectiveLODFactor();
             #endif
 
                 float2 extent = abs(UNITY_MATRIX_P._11_22 * radius);
-                // color alpha is used as a size multipler with a 10/255 being no change to give a range from 0.1 - 25.5x
-                // radius is accounted for by 0.5, hence 10/255 * 0.5 = 12.75
 
             #if !SOLID_COLOR
             #if FOG_LINEAR || FOG_EXP || FOG_EXP2

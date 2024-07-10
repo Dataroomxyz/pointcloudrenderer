@@ -101,8 +101,8 @@ Shader "Hidden/StoryLab PointCloud/URP_Point"
                 pointSize *= GetEffectiveLODFactor();
             #endif
 
-                o.size = AREA_COMPENSATION * pointSize * 25.5 * o.color.a / o.clipPos.w * _ScreenParams.y;
-                // color alpha (8-bit uint) is used as a size multipler with a 10/255 being no change to give a range from 0.1 - 25.5x
+                o.size = AREA_COMPENSATION * pointSize * 255 * o.color.a / o.clipPos.w * _ScreenParams.y;
+                // color alpha (8-bit uint, 0-255, represented as float 0-1) is used as a size multipler
                 return o;
             }
 

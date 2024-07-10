@@ -13,7 +13,7 @@ namespace StoryLabResearch.PointCloud
             int step = Mathf.RoundToInt(1 / Mathf.Clamp01(subsampleFactor));
             int outputVertexCount = originalMesh.vertexCount / step;
             float areaCompensation = compensateArea ? 1f / subsampleFactor : 1f;
-            byte radiusCompensation = (byte)Mathf.RoundToInt(10 * Mathf.Sqrt(areaCompensation));
+            byte radiusCompensation = (byte)Mathf.RoundToInt(Mathf.Sqrt(areaCompensation));
 
             var vertices = new Vector3[outputVertexCount];
             var colors32 = new Color32[outputVertexCount];

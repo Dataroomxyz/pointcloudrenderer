@@ -26,7 +26,7 @@ namespace StoryLabResearch.PointCloud
         {
             LODDescriptions = new LODDescription[]
             {
-            new LODDescription { subsampleFactor = 1.0f, screenRelativeTransitionHeight = 0.9f, fadeTransitionWidth = 1.0f },
+            new LODDescription { subsampleFactor = 1.0f, screenRelativeTransitionHeight = 0.8f, fadeTransitionWidth = 1.0f },
             new LODDescription { subsampleFactor = 0.5f, screenRelativeTransitionHeight = 0.1f, fadeTransitionWidth = 0.1f },
             new LODDescription { subsampleFactor = 0.1f, screenRelativeTransitionHeight = 0.05f, fadeTransitionWidth = 0.1f },
             new LODDescription { subsampleFactor = 0.01f, screenRelativeTransitionHeight = 0.005f, fadeTransitionWidth = 0.1f }
@@ -58,10 +58,7 @@ namespace StoryLabResearch.PointCloud
 
         public static readonly string SHADER_PATH = "Packages/com.storylabresearch.pointcloudrenderer/runtime/shaders/";
         private const bool USE_ALPHA_FOR_POINT_SIZE_MULTIPLER = true;
-        // shader uses alpha * 0.1 as a point size multiplier so LODs don't need unique shaders
-        // this means we can multiply the size of the point in a range from 0.0 - 25.5
-        // this is sufficient to cover the expected decimations of 10x and 100x
-        // (requiring size multipliers of ~3.2 and 10 respectively to compensate the area loss)
+        // shader uses alpha as a point size multiplier
         // The only reason this is a const is to make it really obvious what I'm doing here
 
         public override void OnImportAsset(AssetImportContext context)
@@ -327,7 +324,7 @@ namespace StoryLabResearch.PointCloud
             )
             {
                 vertices.Add(new Vector3(x, y, z) * rescale);
-                if (USE_ALPHA_FOR_POINT_SIZE_MULTIPLER) a = 10;
+                if (USE_ALPHA_FOR_POINT_SIZE_MULTIPLER) a = 1;
                 if (applySRGBCorrection) colors.Add(new Color32(CorrectSRGB(r), CorrectSRGB(g), CorrectSRGB(b), a));
                 else colors.Add(new Color32(r, g, b, a));
             }
