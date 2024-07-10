@@ -14,7 +14,7 @@ namespace StoryLabResearch.PointCloud
     public class LODDescription
     {
         [Range(0f, 1f)] public float subsampleFactor = 1;
-        [Min(0f)] public float screenRelativeTransitionHeightPerUnit = .2f;
+        [Range(0f, 1f)] public float screenRelativeTransitionHeight = .2f;
         [Range(0f, 1f)] public float fadeTransitionWidth = .1f;
         public bool compensateArea = true;
     }
@@ -26,10 +26,10 @@ namespace StoryLabResearch.PointCloud
         {
             LODDescriptions = new LODDescription[]
             {
-            new LODDescription { subsampleFactor = 1.0f, screenRelativeTransitionHeightPerUnit = 2.5f, fadeTransitionWidth = 0.1f },
-            new LODDescription { subsampleFactor = 0.5f, screenRelativeTransitionHeightPerUnit = 1.0f, fadeTransitionWidth = 0.1f },
-            new LODDescription { subsampleFactor = 0.1f, screenRelativeTransitionHeightPerUnit = 0.25f, fadeTransitionWidth = 0.1f },
-            new LODDescription { subsampleFactor = 0.01f, screenRelativeTransitionHeightPerUnit = 0.025f, fadeTransitionWidth = 0.1f }
+            new LODDescription { subsampleFactor = 1.0f, screenRelativeTransitionHeight = 0.9f, fadeTransitionWidth = 1.0f },
+            new LODDescription { subsampleFactor = 0.5f, screenRelativeTransitionHeight = 0.1f, fadeTransitionWidth = 0.1f },
+            new LODDescription { subsampleFactor = 0.1f, screenRelativeTransitionHeight = 0.05f, fadeTransitionWidth = 0.1f },
+            new LODDescription { subsampleFactor = 0.01f, screenRelativeTransitionHeight = 0.005f, fadeTransitionWidth = 0.1f }
             };
             GenerateLODs = true;
         }
@@ -221,10 +221,10 @@ namespace StoryLabResearch.PointCloud
             LODDescription[] OrderedLODDescriptions = LODDescriptions;
             for (int i = 1; i < LODDescriptions.Length; i++)
             {
-                if (LODDescriptions[i].screenRelativeTransitionHeightPerUnit > LODDescriptions[i - 1].screenRelativeTransitionHeightPerUnit)
+                if (LODDescriptions[i].screenRelativeTransitionHeight > LODDescriptions[i - 1].screenRelativeTransitionHeight)
                 {
                     Debug.LogWarning("LOD Descriptions are not in transition size order, reordering...");
-                    OrderedLODDescriptions = LODDescriptions.OrderByDescending(o => o.screenRelativeTransitionHeightPerUnit).ToArray();
+                    OrderedLODDescriptions = LODDescriptions.OrderByDescending(o => o.screenRelativeTransitionHeight).ToArray();
                     break;
                 }
             }
@@ -248,7 +248,7 @@ namespace StoryLabResearch.PointCloud
 
             var LOD = new LOD
             {
-                screenRelativeTransitionHeight = description.screenRelativeTransitionHeightPerUnit / ChunkSize,
+                screenRelativeTransitionHeight = description.screenRelativeTransitionHeight,
                 fadeTransitionWidth = description.fadeTransitionWidth,
                 renderers = new Renderer[] { meshRenderer }
             };
