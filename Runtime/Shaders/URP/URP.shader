@@ -68,14 +68,12 @@ Shader "StoryLab PointCloud/URP"
             #endif
             };
 
-        #if !SOLID_COLOR && !UNITY_COLORSPACE_GAMMA
             // assume that the vertex color is stored in sRGB space
             float3 GammaToLinearSpace(float3 sRGB)
             {
                 // Approximate version from http://chilliant.blogspot.com.au/2012/08/srgb-approximations-for-hlsl.html?m=1
                 return sRGB * (sRGB * (sRGB * 0.305306011f + 0.682171111f) + 0.012522878f);
             }
-        #endif
 
         #if LOD_FADE_CROSSFADE
             float GetAbsoluteLODFactor()
