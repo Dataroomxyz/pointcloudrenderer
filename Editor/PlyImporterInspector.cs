@@ -15,8 +15,8 @@ namespace StoryLabResearch.PointCloud
         SerializedProperty _containerType;
         string[] _containerTypeNames;
 
-        SerializedProperty _subsample;
-        SerializedProperty _initialSubsampleFactor;
+        SerializedProperty _initialSubsampleMode;
+        SerializedProperty _initialSubsampleValue;
 
         SerializedProperty _materialMode;
         SerializedProperty _customMaterialOverride;
@@ -29,7 +29,13 @@ namespace StoryLabResearch.PointCloud
         GUIContent _generateLODsLabel = new("Generate LODs");
         SerializedProperty _crossFadeLODs;
         GUIContent _crossFadeLODsLabel = new("CrossFade LODs");
+        SerializedProperty _fastLODGeneration;
+        GUIContent _fastLODGenerationLabel = new("Fast LOD Generation");
         SerializedProperty _lodDescriptions;
+
+        SerializedProperty _debugRangeColors;
+        GUIContent _debugRangeLabel = new("Debug Range");
+        SerializedProperty _debugRange;
 
         public override void OnEnable()
         {
@@ -41,8 +47,8 @@ namespace StoryLabResearch.PointCloud
             _containerType = serializedObject.FindProperty(nameof(PlyImporter.ContainerType));
             _containerTypeNames = System.Enum.GetNames(typeof(PlyImporter.EAssetContainerType));
 
-            _subsample = serializedObject.FindProperty(nameof(PlyImporter.Subsample));
-            _initialSubsampleFactor = serializedObject.FindProperty(nameof(PlyImporter.SubsampleFactor));
+            _initialSubsampleMode = serializedObject.FindProperty(nameof(PlyImporter.InitialSubsampleMode));
+            _initialSubsampleValue = serializedObject.FindProperty(nameof(PlyImporter.SubsampleValue));
 
             _materialMode = serializedObject.FindProperty(nameof(PlyImporter.MaterialMode));
             _customMaterialOverride = serializedObject.FindProperty(nameof(PlyImporter.CustomMaterialOverride));
@@ -53,7 +59,11 @@ namespace StoryLabResearch.PointCloud
 
             _generateLODs = serializedObject.FindProperty(nameof(PlyImporter.GenerateLODs));
             _crossFadeLODs = serializedObject.FindProperty(nameof(PlyImporter.CrossFadeLODs));
+            _fastLODGeneration = serializedObject.FindProperty(nameof(PlyImporter.FastLODGeneration));
             _lodDescriptions = serializedObject.FindProperty(nameof(PlyImporter.LODDescriptions));
+
+            _debugRangeColors = serializedObject.FindProperty(nameof(PlyImporter.DebugRangeColors));
+            _debugRange = serializedObject.FindProperty(nameof(PlyImporter.DebugRange));
         }
 
         public override void OnInspectorGUI()
@@ -68,8 +78,12 @@ namespace StoryLabResearch.PointCloud
 
             if (_containerType.intValue == (int)PlyImporter.EAssetContainerType.PointMesh)
             {
-                EditorGUILayout.PropertyField(_subsample);
-                if (_subsample.boolValue) _initialSubsampleFactor.floatValue = EditorGUILayout.Slider(_initialSubsampleFactor.displayName, _initialSubsampleFactor.floatValue, 0f, 1f);
+                EditorGUILayout.PropertyField(_initialSubsampleMode);
+                if (_initialSubsampleMode.intValue == (int)PointMeshSubsampler.ESubsampleMode.Random) _initialSubsampleValue.floatValue = EditorGUILayout.Slider("Subsample Factor", _initialSubsampleValue.floatValue, 0f, 1f);
+                else if (_initialSubsampleMode.intValue == (int)PointMeshSubsampler.ESubsampleMode.SpatialFast 
+                      || _initialSubsampleMode.intValue == (int)PointMeshSubsampler.ESubsampleMode.SpatialThreePass
+                      || _initialSubsampleMode.intValue == (int)PointMeshSubsampler.ESubsampleMode.SpatialExact)
+                    _initialSubsampleValue.floatValue = EditorGUILayout.FloatField("Minimum Distance", Mathf.Max(_initialSubsampleValue.floatValue, 0f));
 
                 EditorGUILayout.Space();
 
@@ -82,6 +96,7 @@ namespace StoryLabResearch.PointCloud
                 if (_generateLODs.boolValue)
                 {
                     EditorGUILayout.PropertyField(_crossFadeLODs, _crossFadeLODsLabel);
+                    EditorGUILayout.PropertyField(_fastLODGeneration, _fastLODGenerationLabel);
                     EditorGUILayout.PropertyField(_lodDescriptions);
                 }
 
@@ -103,6 +118,11 @@ namespace StoryLabResearch.PointCloud
                         break;
                 }
             }
+
+            EditorGUILayout.Space();
+
+            EditorGUILayout.PropertyField(_debugRangeColors);
+            if(_debugRangeColors.boolValue) _debugRange.intValue = Mathf.Max(0, EditorGUILayout.IntField(_debugRangeLabel, _debugRange.intValue));
 
             serializedObject.ApplyModifiedProperties();
             ApplyRevertGUI();

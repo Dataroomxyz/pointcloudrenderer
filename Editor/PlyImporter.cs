@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEditor;
 using UnityEditor.AssetImporters;
-
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -13,10 +12,11 @@ namespace StoryLabResearch.PointCloud
     [System.Serializable]
     public class LODDescription
     {
-        [Range(0f, 1f)] public float subsampleFactor = 1;
-        [Range(0f, 1f)] public float screenRelativeTransitionHeight = .2f;
-        [Range(0f, 1f)] public float fadeTransitionWidth = .1f;
-        public bool compensateArea = true;
+        public PointMeshSubsampler.ESubsampleMode SubsampleMode = PointMeshSubsampler.ESubsampleMode.None;
+        public float SubsampleValue = 1f;
+        [Range(0f, 1f)] public float ScreenRelativeTransitionHeight = .2f;
+        [Range(0f, 1f)] public float FadeTransitionWidth = .1f;
+        public bool CompensateArea = true;
     }
 
     [ScriptedImporter(1, "ply")]
@@ -26,10 +26,10 @@ namespace StoryLabResearch.PointCloud
         {
             LODDescriptions = new LODDescription[]
             {
-            new LODDescription { subsampleFactor = 1.0f, screenRelativeTransitionHeight = 0.8f, fadeTransitionWidth = 1.0f },
-            new LODDescription { subsampleFactor = 0.5f, screenRelativeTransitionHeight = 0.1f, fadeTransitionWidth = 0.1f },
-            new LODDescription { subsampleFactor = 0.1f, screenRelativeTransitionHeight = 0.05f, fadeTransitionWidth = 0.1f },
-            new LODDescription { subsampleFactor = 0.01f, screenRelativeTransitionHeight = 0.005f, fadeTransitionWidth = 0.1f }
+                new() { SubsampleMode = PointMeshSubsampler.ESubsampleMode.None, SubsampleValue = 0f, ScreenRelativeTransitionHeight = 0.7f, FadeTransitionWidth = 0.1f },
+                new() { SubsampleMode = PointMeshSubsampler.ESubsampleMode.SpatialFast, SubsampleValue = 0.02f, ScreenRelativeTransitionHeight = 0.1f, FadeTransitionWidth = 0.1f },
+                new() { SubsampleMode = PointMeshSubsampler.ESubsampleMode.SpatialFast, SubsampleValue = 0.1f, ScreenRelativeTransitionHeight = 0.05f, FadeTransitionWidth = 0.1f },
+                new() { SubsampleMode = PointMeshSubsampler.ESubsampleMode.SpatialFast, SubsampleValue = 0.5f, ScreenRelativeTransitionHeight = 0.005f, FadeTransitionWidth = 0.1f }
             };
             GenerateLODs = true;
         }
@@ -42,21 +42,27 @@ namespace StoryLabResearch.PointCloud
         public bool ApplySRGBCorrection;
         public EAssetContainerType ContainerType = EAssetContainerType.PointMesh;
 
-        public bool Subsample = false;
-        [Range(0f, 1f)] public float SubsampleFactor = 1f;
+        public PointMeshSubsampler.ESubsampleMode InitialSubsampleMode = PointMeshSubsampler.ESubsampleMode.None;
+        public float SubsampleValue = 1f;
+
+        public bool GenerateChunks = true;
+        public float ChunkSize = 5f;
+
+        public bool GenerateLODs = true;
+        public bool CrossFadeLODs = false;
+        public bool FastLODGeneration = true;
+        public LODDescription[] LODDescriptions;
 
         public EMaterialMode MaterialMode = EMaterialMode.Unique;
         public Material CustomMaterialOverride;
         public bool ExtractUniqueMaterial = true;
 
-        public bool GenerateLODs = true;
-        public bool CrossFadeLODs = true;
-        public LODDescription[] LODDescriptions;
-
-        public bool GenerateChunks = true;
-        public float ChunkSize = 5f;
+        public bool DebugRangeColors = false;
+        public int DebugRange = 13429;
 
         public static readonly string SHADER_PATH = "Packages/com.storylabresearch.pointcloudrenderer/runtime/shaders/";
+        //public static readonly string SHADER_PATH = "assets/pointcloudrenderer/runtime/shaders/";
+
         private const bool USE_ALPHA_FOR_POINT_SIZE_MULTIPLER = true;
         // shader uses alpha as a point size multiplier
         // The only reason this is a const is to make it really obvious what I'm doing here
@@ -107,7 +113,7 @@ namespace StoryLabResearch.PointCloud
         private Mesh GetPlyMesh(AssetImportContext context)
         {
             var plyMesh = ReadDataAsMesh(context.assetPath, false);
-            if (Subsample && SubsampleFactor < 1f) plyMesh = PointMeshSubsampler.SubsampleMesh(plyMesh, SubsampleFactor);
+            if (InitialSubsampleMode != PointMeshSubsampler.ESubsampleMode.None) plyMesh = PointMeshSubsampler.SubsampleMesh(InitialSubsampleMode, plyMesh, plyMesh.name, SubsampleValue);
             return plyMesh;
         }
 
@@ -177,13 +183,11 @@ namespace StoryLabResearch.PointCloud
                 gameObject.transform.parent = rootGameObject.transform;
                 gameObject.name = mesh.name;
 
-                if (GenerateLODs) CreateAndAddLODGroupObject(context, mesh, material, gameObject);
+                if (GenerateLODs) CreateAndAddLODGroupObject(context, mesh, material, gameObject, LODDescriptions, CrossFadeLODs, FastLODGeneration);
                 else CreateAndAddSingleMeshObject(context, material, mesh, gameObject);
 
                 context.AddObjectToAsset(mesh.name + " object", gameObject);
             }
-
-            Debug.Log("Mesh count: " + meshes.Length * (GenerateLODs ? LODDescriptions.Length : 1));
         }
 
         private static void CreateAndAddSingleMeshObject(AssetImportContext context, Material material, Mesh mesh, GameObject gameObject)
@@ -197,42 +201,52 @@ namespace StoryLabResearch.PointCloud
             context.AddObjectToAsset(mesh.name, mesh);
         }
 
-        private void CreateAndAddLODGroupObject(AssetImportContext context, Mesh mesh, Material material, GameObject gameObject)
+        private void CreateAndAddLODGroupObject(AssetImportContext context, Mesh mesh, Material material, GameObject gameObject, LODDescription[] lodDescriptions, bool crossFadeLODs, bool fastLODGeneration)
         {
             var lodGroup = gameObject.AddComponent<LODGroup>();
-            var LODs = new LOD[LODDescriptions.Length];
 
-            LODDescription[] OrderedLODDescriptions = OrderLODDescriptionsIfNecessary();
-
-            for (int i = 0; i < LODDescriptions.Length; i++)
-            {
-                LODs[i] = CreateAddAndReturnLODMeshObject(context, gameObject, mesh, OrderedLODDescriptions[i], material, "_LOD" + i);
-            }
+            var LODs = CreateAndAddLODRenderers(context, mesh, material, gameObject, lodDescriptions, fastLODGeneration);
 
             lodGroup.SetLODs(LODs);
-            lodGroup.fadeMode = CrossFadeLODs ? LODFadeMode.CrossFade : LODFadeMode.None;
+            lodGroup.fadeMode = crossFadeLODs ? LODFadeMode.CrossFade : LODFadeMode.None;
         }
 
-        private LODDescription[] OrderLODDescriptionsIfNecessary()
+        private LOD[] CreateAndAddLODRenderers(AssetImportContext context, Mesh mesh, Material material, GameObject gameObject, LODDescription[] lodDescriptions, bool fastLODGeneration)
         {
-            LODDescription[] OrderedLODDescriptions = LODDescriptions;
-            for (int i = 1; i < LODDescriptions.Length; i++)
+            LODDescription[] OrderedLODDescriptions = OrderLODDescriptionsIfNecessary(lodDescriptions);
+            var LODs = new LOD[OrderedLODDescriptions.Length];
+            var workingMesh = mesh;
+            var referencePointCount = mesh.vertexCount;
+
+            for (int i = 0; i < lodDescriptions.Length; i++)
             {
-                if (LODDescriptions[i].screenRelativeTransitionHeight > LODDescriptions[i - 1].screenRelativeTransitionHeight)
+                Mesh subsampledMesh = PointMeshSubsampler.SubsampleMesh(OrderedLODDescriptions[i].SubsampleMode, workingMesh, mesh.name + "_LOD" + i, OrderedLODDescriptions[i].SubsampleValue, referencePointCount, true);
+                context.AddObjectToAsset(subsampledMesh.name, subsampledMesh);
+                LODs[i] = CreateAddAndReturnLODRendererObject(context, gameObject, subsampledMesh, OrderedLODDescriptions[i], material);
+
+                if (fastLODGeneration) workingMesh = subsampledMesh; // use the already subsampled output mesh as the start point for the next LOD level
+            }
+
+            return LODs;
+        }
+
+        private LODDescription[] OrderLODDescriptionsIfNecessary(LODDescription[] lodDescriptions)
+        {
+            LODDescription[] orderedLODDescriptions = lodDescriptions;
+            for (int i = 1; i < lodDescriptions.Length; i++)
+            {
+                if (lodDescriptions[i].ScreenRelativeTransitionHeight > lodDescriptions[i - 1].ScreenRelativeTransitionHeight)
                 {
                     Debug.LogWarning("LOD Descriptions are not in transition size order, reordering...");
-                    OrderedLODDescriptions = LODDescriptions.OrderByDescending(o => o.screenRelativeTransitionHeight).ToArray();
+                    orderedLODDescriptions = lodDescriptions.OrderByDescending(o => o.ScreenRelativeTransitionHeight).ToArray();
                     break;
                 }
             }
-            return OrderedLODDescriptions;
+            return orderedLODDescriptions;
         }
 
-        private LOD CreateAddAndReturnLODMeshObject(AssetImportContext context, GameObject gameObject, Mesh originalMesh, LODDescription description, Material material, string suffix = "")
+        private LOD CreateAddAndReturnLODRendererObject(AssetImportContext context, GameObject gameObject, Mesh subsampledMesh, LODDescription description, Material material)
         {
-            Mesh subsampledMesh = PointMeshSubsampler.SubsampleMesh(originalMesh, description.subsampleFactor, suffix);
-            context.AddObjectToAsset(subsampledMesh.name, subsampledMesh);
-
             var subGameObject = new GameObject();
             subGameObject.transform.parent = gameObject.transform;
             subGameObject.name = subsampledMesh.name;
@@ -245,8 +259,8 @@ namespace StoryLabResearch.PointCloud
 
             var LOD = new LOD
             {
-                screenRelativeTransitionHeight = description.screenRelativeTransitionHeight,
-                fadeTransitionWidth = description.fadeTransitionWidth,
+                screenRelativeTransitionHeight = description.ScreenRelativeTransitionHeight,
+                fadeTransitionWidth = description.FadeTransitionWidth,
                 renderers = new Renderer[] { meshRenderer }
             };
 
@@ -556,6 +570,25 @@ namespace StoryLabResearch.PointCloud
                 }
 
                 data.AddPoint(x, y, z, r, g, b, a, Rescale, ApplySRGBCorrection);
+            }
+
+            if (DebugRangeColors)
+            {
+                int colorChangeTracker = 0;
+                int colorChangeInterval = DebugRange;
+                for (int i = 0; i < header.vertexCount; i++)
+                {
+                    if (colorChangeTracker >= colorChangeInterval)
+                    {
+                        colorChangeTracker = 0;
+                        r = (byte)UnityEngine.Random.Range(0, 256);
+                        g = (byte)UnityEngine.Random.Range(0, 256);
+                        b = (byte)UnityEngine.Random.Range(0, 256);
+                    }
+
+                    data.colors[i] = new Color32(r, g, b, data.colors[i].a);
+                    colorChangeTracker++;
+                }
             }
 
             return data;
