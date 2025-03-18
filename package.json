@@ -1,13 +1,37 @@
 {
   "name": "com.storylabresearch.pointcloudrenderer",
-  "version": "0.0.1",
-  "displayName": "StoryLabResearch PointCloud Renderer",
-  "description": "Importer, chunker and LOD generator with PCX-based importing and rendering mechanisms for PLY pointcloud files",
-  "unity": "2022.3",
-  "unityRelease": "5f1",
+  "version": "1.0.0",
+  "displayName": "StoryLab PointCloud Renderer",
+  "description": "Importer, chunker and LOD generator with optimized rendering mechanisms for PLY pointcloud files. Updated for Unity 6 with Meta Quest 3 optimization.",
+  "unity": "6.0",
+  "documentationUrl": "https://github.com/Dataroomxyz/pointcloudrenderer",
+  "changelogUrl": "https://github.com/Dataroomxyz/pointcloudrenderer/blob/main/CHANGELOG.md",
+  "licensesUrl": "https://github.com/Dataroomxyz/pointcloudrenderer/blob/main/LICENSE.md",
+  "dependencies": {
+    "com.unity.render-pipelines.universal": "17.0.0"
+  },
+  "keywords": [
+    "pointcloud",
+    "ply",
+    "vr",
+    "quest",
+    "visualization"
+  ],
   "author": {
-    "name": "Chris Nightingale",
+    "name": "Chris Nightingale, updated by Dataroomxyz",
     "email": "StoryLab@aru.ac.uk",
     "url": "storylabresearch.com"
-  }
+  },
+  "samples": [
+    {
+      "displayName": "Basic Point Cloud Demo",
+      "description": "Contains basic example of imported point cloud usage",
+      "path": "Samples~/BasicDemo"
+    },
+    {
+      "displayName": "VR Point Cloud Demo",
+      "description": "Contains optimized VR example for Meta Quest 3",
+      "path": "Samples~/VRDemo"
+    }
+  ]
 }

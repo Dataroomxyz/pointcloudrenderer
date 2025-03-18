@@ -1,0 +1,234 @@
+/*
+Optimized for Meta Quest 3 and Unity 6
+Based on original work by Chris Nightingale, 2023
+*/
+
+Shader "StoryLab PointCloud/URP_Mobile"
+{
+    Properties
+    {
+        _PointSize("Point Size", Float) = 0.02
+        [KeywordEnum(Vertex, Solid, Blend)] _ColorMode("Color Mode", int) = 0
+        _Color("Color", Color) = (1,1,1,1)
+        _ColorBlend("Color Blend", Range(0,1)) = 0
+        _VRScale("VR Scale Multiplier", Range(0.1,3.0)) = 1.0
+        _DistanceFade("Distance Fade", Range(0,1)) = 0.5
+    }
+    SubShader
+    {
+        Tags
+        {
+            "RenderType" = "Opaque"
+            "Queue" = "Geometry"
+            "RenderPipeline" = "UniversalPipeline"
+        }
+        LOD 100
+        Cull Off
+
+        HLSLINCLUDE
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            struct appdata
+            {
+                float4 vertex : POSITION;
+                float4 color : COLOR;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+            };
+
+            struct v2f
+            {
+                float4 pos : SV_POSITION;
+                float4 color : COLOR;
+                float size : PSIZE;
+                float4 worldPos : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID
+                UNITY_VERTEX_OUTPUT_STEREO
+            };
+
+            CBUFFER_START(UnityPerMaterial)
+                float _PointSize;
+                half4 _Color;
+                float _ColorBlend;
+                float _VRScale;
+                float _DistanceFade;
+            CBUFFER_END
+
+            // Gamma to linear space conversion (optimized for mobile)
+            float3 GammaToLinearSpaceFast(float3 sRGB)
+            {
+                return sRGB * (sRGB * (sRGB * 0.305306011f + 0.682171111f) + 0.012522878f);
+            }
+
+            #if LOD_FADE_CROSSFADE
+                float GetEffectiveLODFactor()
+                {
+                    float factor = unity_LODFade.x;
+                    if (factor < 0) factor = 1 + factor;
+                    return saturate(factor * 1.5);
+                }
+            #endif
+
+            v2f vert(appdata v)
+            {
+                v2f o;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_TRANSFER_INSTANCE_ID(v, o);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+                
+                // Calculate position
+                float4 worldPos = mul(UNITY_MATRIX_M, v.vertex);
+                o.worldPos = worldPos;
+                o.pos = mul(UNITY_MATRIX_VP, worldPos);
+                
+                // Pass color
+                o.color = v.color;
+                
+                // Calculate point size with distance scaling
+                float distanceToCamera = length(_WorldSpaceCameraPos.xyz - worldPos.xyz);
+                float distanceScale = 1.0 / max(1.0, distanceToCamera * _DistanceFade);
+                
+                float pointSize = _PointSize * _VRScale * v.color.a * 255.0 * distanceScale;
+                
+                #if LOD_FADE_CROSSFADE
+                    pointSize *= GetEffectiveLODFactor();
+                #endif
+                
+                o.size = pointSize;
+                
+                return o;
+            }
+
+            // Vertex shader for billboard quads
+            v2f vertBillboard(appdata v, uint vertexID : SV_VertexID)
+            {
+                v2f o;
+                UNITY_SETUP_INSTANCE_ID(v);
+                UNITY_TRANSFER_INSTANCE_ID(v, o);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+                
+                // Calculate world position
+                float4 worldPos = mul(UNITY_MATRIX_M, v.vertex);
+                o.worldPos = worldPos;
+                
+                // Calculate distance scale factor (smaller points when far away)
+                float distanceToCamera = length(_WorldSpaceCameraPos.xyz - worldPos.xyz);
+                float distanceScale = 1.0 / max(1.0, distanceToCamera * _DistanceFade);
+                
+                // Calculate scaled point size
+                float pointSize = _PointSize * _VRScale * v.color.a * 255.0 * distanceScale;
+                
+                #if LOD_FADE_CROSSFADE
+                    pointSize *= GetEffectiveLODFactor();
+                #endif
+                
+                o.size = pointSize;
+                
+                // Calculate billboard corners (0=TL, 1=BL, 2=TR, 3=BR)
+                float2 offset = float2(
+                    (vertexID == 0 || vertexID == 1) ? -1.0 : 1.0,  // X: -1 for left vertices, 1 for right
+                    (vertexID == 0 || vertexID == 2) ? 1.0 : -1.0   // Y: 1 for top vertices, -1 for bottom
+                );
+                
+                // Billboard in camera space
+                float3 cameraRight = normalize(UNITY_MATRIX_V[0].xyz);
+                float3 cameraUp = normalize(UNITY_MATRIX_V[1].xyz);
+                
+                // Add billboard offset to world position
+                worldPos.xyz += (cameraRight * offset.x + cameraUp * offset.y) * pointSize * 0.5;
+                
+                // Transform to clip space
+                o.pos = mul(UNITY_MATRIX_VP, worldPos);
+                o.color = v.color;
+                
+                return o;
+            }
+
+            half4 frag(v2f i) : SV_Target
+            {
+                UNITY_SETUP_INSTANCE_ID(i);
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(i);
+                
+                #if LOD_FADE_CROSSFADE && defined(_DEBUG)
+                    return half4(1, 1, 0, 1);  // Debug yellow for crossfade regions
+                #else
+                    #if _COLORMODE_SOLID
+                        return _Color;
+                    #else
+                        #if _COLORMODE_BLEND
+                            half3 outColor = lerp(i.color.rgb, _Color.rgb, _ColorBlend);
+                        #else
+                            half3 outColor = i.color.rgb;
+                        #endif
+                        
+                        #ifndef UNITY_COLORSPACE_GAMMA
+                            outColor = GammaToLinearSpaceFast(outColor);
+                        #endif
+                        
+                        return half4(outColor, 1);
+                    #endif
+                #endif
+            }
+        ENDHLSL
+
+        // Optimized pass for mobile rendering - uses hardware instancing where possible
+        Pass
+        {
+            Name "Mobile Forward"
+            Tags
+            {
+                "LightMode" = "UniversalForward"
+            }
+
+            HLSLPROGRAM
+                #pragma target 3.5
+                #pragma multi_compile_instancing
+                #pragma multi_compile _ LOD_FADE_CROSSFADE
+                #pragma multi_compile _ _DEBUG
+                #pragma shader_feature_local _COLORMODE_VERTEX _COLORMODE_SOLID _COLORMODE_BLEND
+                
+                // Use the instanced billboard approach for mobile
+                #pragma vertex vertBillboard
+                #pragma fragment frag
+                
+                // Define quad mesh topology with 4 vertices per point
+                #pragma require_portability quadlist
+            ENDHLSL
+        }
+
+        // Depth-only pass for shadows
+        Pass
+        {
+            Name "DepthOnly"
+            Tags
+            {
+                "LightMode" = "DepthOnly"
+            }
+
+            ColorMask 0
+            ZWrite On
+
+            HLSLPROGRAM
+                #pragma target 3.5
+                #pragma multi_compile_instancing
+                #pragma multi_compile _ LOD_FADE_CROSSFADE
+                
+                // Use the instanced billboard approach for mobile
+                #pragma vertex vertBillboard
+                #pragma fragment frag_depth
+                
+                // Define quad mesh topology
+                #pragma require_portability quadlist
+                
+                half4 frag_depth(v2f i) : SV_Target
+                {
+                    return 0;
+                }
+            ENDHLSL
+        }
+    }
+    
+    // Fallback shader for devices without sufficient capability
+    Fallback "Universal Render Pipeline/Unlit"
+    CustomEditor "StoryLabResearch.PointCloud.PointCloudShaderGUI"
+}

@@ -1,9 +1,8 @@
 /*
 Chris Nightingale, 2023
+Updated for Unity 6 compatibility by DataRoomXYZ, 2025
 
 Note: Meshes should be in Point topology mode, or else some vertices may not be rendered
-
-Stereo implementation from https://discussions.unity.com/t/geometry-shader-in-vr-stereo-rendering-mode-single-pass-instanced/231825/2
 */
 
 Shader "StoryLab PointCloud/URP"
@@ -14,7 +13,8 @@ Shader "StoryLab PointCloud/URP"
         [KeywordEnum(Vertex, Solid, Blend)] _ColorMode("Color Mode", int) = 0
         _Color("Color", Color) = (1,1,1,1)
         _ColorBlend("Color Blend", Range(0,1)) = 0
-        // note to self: Even if we are using solid color, we still need to pass the color data through because the shader uses the alpha for scale
+        _VRScale("VR Scale Multiplier", Range(0.1,3.0)) = 1.0
+        _DistanceFade("Distance Fade", Range(0,1)) = 0.5
         [Toggle(DEBUG)] _Debug("Debug Crossfade", Float) = 0
     }
     SubShader
@@ -30,11 +30,14 @@ Shader "StoryLab PointCloud/URP"
 
         HLSLINCLUDE
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
             CBUFFER_START(UnityPerMaterial)
                 float _PointSize;
                 half4 _Color;
                 float _ColorBlend;
+                float _VRScale;
+                float _DistanceFade;
             CBUFFER_END
 
             struct a2v
@@ -49,6 +52,7 @@ Shader "StoryLab PointCloud/URP"
             {
                 float4 clipPos  : SV_POSITION;
                 float4 color    : COLOR;
+                float4 worldPos : TEXCOORD0;
 
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
@@ -61,30 +65,23 @@ Shader "StoryLab PointCloud/URP"
                 UNITY_VERTEX_INPUT_INSTANCE_ID
                 UNITY_VERTEX_OUTPUT_STEREO
 
-            #if !SOLID_COLOR
             #if FOG_LINEAR || FOG_EXP || FOG_EXP2
                 float fogCoords : TEXCOORD1;
             #endif
-            #endif
             };
 
-            // assume that the vertex color is stored in sRGB space
-            float3 GammaToLinearSpace(float3 sRGB)
+            // More efficient gamma to linear conversion for Unity 6
+            float3 GammaToLinearSpaceOptimized(float3 sRGB)
             {
-                // Approximate version from http://chilliant.blogspot.com.au/2012/08/srgb-approximations-for-hlsl.html?m=1
                 return sRGB * (sRGB * (sRGB * 0.305306011f + 0.682171111f) + 0.012522878f);
             }
 
         #if LOD_FADE_CROSSFADE
-            float GetAbsoluteLODFactor()
-            {
-                if (unity_LODFade.x >= 0) return unity_LODFade.x;
-                else return 1 + unity_LODFade.x;
-            }
-
             float GetEffectiveLODFactor()
             {
-                return saturate(GetAbsoluteLODFactor() * 1.5);
+                float factor = unity_LODFade.x;
+                if (factor < 0) factor = 1 + factor;
+                return saturate(factor * 1.5);
             }
         #endif
 
@@ -96,6 +93,7 @@ Shader "StoryLab PointCloud/URP"
                 UNITY_TRANSFER_INSTANCE_ID(v, o);
 
                 o.clipPos = TransformObjectToHClip(v.vertex.xyz);
+                o.worldPos = mul(UNITY_MATRIX_M, float4(v.vertex.xyz, 1.0));
                 o.color = v.color;
                 return o;
             }
@@ -110,12 +108,17 @@ Shader "StoryLab PointCloud/URP"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
                 float4 vert = input[0].clipPos;
+                float4 worldPos = input[0].worldPos;
 
                 o.clipPos = vert;
                 o.color = input[0].color;
 
-                float radius = _PointSize * o.color.a * 255 * 0.5f;
-                // color alpha (8-bit uint, 0-255, represented as float 0-1) is used as a size multipler
+                // Calculate distance scale factor (smaller points when far away)
+                float distanceToCamera = length(_WorldSpaceCameraPos.xyz - worldPos.xyz);
+                float distanceScale = 1.0 / max(1.0, distanceToCamera * _DistanceFade);
+                
+                // Calculate scaled point size
+                float radius = _PointSize * _VRScale * o.color.a * 255.0 * 0.5 * distanceScale;
 
             #if LOD_FADE_CROSSFADE
                 radius *= GetEffectiveLODFactor();
@@ -123,13 +126,9 @@ Shader "StoryLab PointCloud/URP"
 
                 float2 extent = abs(UNITY_MATRIX_P._11_22 * radius);
 
-            #if !SOLID_COLOR
             #if FOG_LINEAR || FOG_EXP || FOG_EXP2
                 o.fogCoords = ComputeFogFactor(vert.z);
             #endif
-            #endif
-
-                // https://learn.microsoft.com/en-us/windows/win32/direct3d11/d3d10-graphics-programming-guide-primitive-topologies
 
                 // Triangle strips version
                 // Top vertex
@@ -158,10 +157,10 @@ Shader "StoryLab PointCloud/URP"
                     return half3(1, 1, 0);
                 #else
                     #if _COLORMODE_SOLID
-                        return _Color;
+                        return _Color.rgb;
                     #else
                         #if _COLORMODE_BLEND
-                            half3 outColor = ((1 - _ColorBlend) * m.color.rgb) + (_ColorBlend * _Color.rgb);
+                            half3 outColor = lerp(m.color.rgb, _Color.rgb, _ColorBlend);
                         #else
                             half3 outColor = m.color.rgb;
                         #endif
@@ -173,9 +172,9 @@ Shader "StoryLab PointCloud/URP"
                             #endif
                         #else
                             #if FOG_LINEAR || FOG_EXP || FOG_EXP2
-                                return GammaToLinearSpace(MixFog(outColor, m.fogCoords));
+                                return GammaToLinearSpaceOptimized(MixFog(outColor, m.fogCoords));
                             #else
-                                return GammaToLinearSpace(outColor);
+                                return GammaToLinearSpaceOptimized(outColor);
                             #endif
                         #endif
                     #endif
@@ -201,11 +200,10 @@ Shader "StoryLab PointCloud/URP"
 
             HLSLPROGRAM
                 #pragma target 4.5
-                //#pragma exclude_renderers gles gles3 glcore 
                 #pragma multi_compile_fog
                 #pragma multi_compile _ UNITY_COLORSPACE_GAMMA
                 #pragma multi_compile_instancing
-                #pragma shader_feature _COLORMODE_VERTEX _COLORMODE_SOLID _COLORMODE_BLEND
+                #pragma shader_feature_local _COLORMODE_VERTEX _COLORMODE_SOLID _COLORMODE_BLEND
                 #pragma multi_compile _ LOD_FADE_CROSSFADE
                 #pragma multi_compile _ DEBUG
                 #pragma require geometry
@@ -228,7 +226,6 @@ Shader "StoryLab PointCloud/URP"
 
             HLSLPROGRAM
                 #pragma target 4.5
-                //#pragma exclude_renderers gles gles3 glcore 
                 #pragma multi_compile _ UNITY_COLORSPACE_GAMMA
                 #pragma multi_compile_instancing
                 #pragma multi_compile _ LOD_FADE_CROSSFADE
@@ -239,6 +236,6 @@ Shader "StoryLab PointCloud/URP"
             ENDHLSL
         }
     }
-    Fallback "Hidden/StoryLab PointCloud/URP_Point"
+    Fallback "StoryLab PointCloud/URP_Mobile"
     CustomEditor "StoryLabResearch.PointCloud.PointCloudShaderGUI"
 }

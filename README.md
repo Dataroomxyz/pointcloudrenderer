@@ -1,42 +1,103 @@
-# StoryLab Point Cloud Renderer
-Importer, chunker and LOD generator with PCX-based importing and rendering mechanisms for PLY pointcloud files. Compatible with instanced rendering for VR applications.
+# StoryLab PointCloud Renderer for Unity 6
 
-The point clouds can optionally be broken into cubic chunks to significantly improve rendering performance. The importer can also optionally auto-generate LODs for the point clouds, which improves performance by an order of magnitude when a large portion of the point cloud is far enough from the camera that individual points cannot be distinguished. To maintain the same visual appearance, the size of the points is increased to compensate for the loss of area as points are removed at far distances. A set of recommended LOD settings is included by default, but this can be user modified.
+An optimized point cloud renderer for Unity 6 with special support for Meta Quest 3 and other VR platforms.
 
-The following graph shows performance across a test set of seven point clouds from various viewing angles, ranging from 0.5 million points to 57.8 million points. In the most intensive test scenario, the chunking and LOD system with the default settings included in the package were found to improve GPU performance from 81ms/frame (12FPS) to 5ms/frame (200fps) on a cloud of 57.8 million points. These tests were carried out on URP, Multipass rendering, Ryzen 7 5800H, 40GB DDR4-3200, RTX 3060 Mobile, Oculus Quest 2 via Quest Link at native resolution.
+## Features
 
-![Screenshot 2023-10-24 123909](https://github.com/StoryLab-Research-Institute/pointcloudrenderer/assets/114744494/6d14a3c9-7b94-4101-8873-89031e4de160)
+- Import and render PLY point cloud files in Unity 6
+- VR-optimized rendering for Meta Quest 3 and other mobile VR headsets
+- Dynamic LOD system with automatic performance optimization
+- Flexible chunking system for efficient rendering
+- Multiple rendering quality presets for VR
 
-The point shaders are integrated into the Unity LOD cross-fade system, using resizing of the points according to the cross-fade factor to provide a very cheap means of cross-fading with no need for transparency or dithering. The transition between LOD stages can still be noticable for significant differences in point density, but for slow movement and dense clouds it was found to become almost indistinguishable. The point sizes in the clip below have been exaggerated to make the transition more visible.
+## Requirements
 
-https://github.com/StoryLab-Research-Institute/pointcloudrenderer/assets/114744494/0347edfb-56c6-4f8c-aaa6-b7d6f8ff79f8
+- Unity 6.0.0 or later
+- Universal Render Pipeline (URP) package
+- For VR: XR Interaction Toolkit and OpenXR packages
 
-The points are rendered as diamonds on platforms supporting geometry shaders, as these were found to be more visually pleasing than vertically aligned squares.
+## Installation
 
-# Recommendations
-If you have point clouds with a lot of overdraw, for example you are using large points for sylistic reasons, you may wish to turn on forced depth texture priming in URP. This setting can be found in your Universal Renderer Data as "Depth Priming Mode" (under "rendering"), and allows the renderer to use depth information to decide whether to draw a given pixel of an object or not. On the test system, this improved performance significantly with large point sizes.
+### Option 1: Install via Unity Package Manager (UPM)
 
-# Limitations
-Only supports URP for now. There is no technical reason why BRP cannot be supported (in fact I already wrote a version of the shaders for BRP), I simply haven't updated the BRP shaders to match the URP ones yet for a consistent experience.
+1. Open your Unity project
+2. Go to Window > Package Manager
+3. Click the "+" button and select "Add package from git URL..."
+4. Enter the following URL:
+   ```
+   https://github.com/Dataroomxyz/pointcloudrenderer.git
+   ```
+5. Click "Add"
 
-Point Clouds are rendered using geometry shaders on platforms which support them, or will otherwise fall back on the rendering API's default points mechanism, which may or may not respect the point size (DX11 will never render more than one pixel, OpenGL will always render the point as a sized quad).
+### Option 2: Clone the Repository
 
-Only binary little-endian PLY files are supported.
+1. Clone the repository to your local machine:
+   ```
+   git clone https://github.com/Dataroomxyz/pointcloudrenderer.git
+   ```
+2. In Unity, go to Window > Package Manager
+3. Click the "+" button and select "Add package from disk..."
+4. Navigate to the cloned repository and select the package.json file
 
-This package was developed in Unity 2022.3.5f1 LTS and URP 14.0.8, and has not been tested on other versions.
+## Quick Start
 
-# Installation
-Install via the package manager.
+### Importing Point Clouds
 
-![Picture1](https://github.com/StoryLab-Research-Institute/pointcloudrenderer/assets/114744494/3322c55e-da6a-4249-aeb7-ef8037faa1fc)
+1. Copy your .ply files into your Unity project
+2. Select a .ply file in the Project window
+3. In the Inspector, adjust the import settings:
+   - For VR projects, enable "Optimize for VR" and select an appropriate optimization level
+   - Adjust Chunk Size, LOD settings, and other parameters as needed
+4. Click "Apply" to import the point cloud
 
-Enter the GitHub URL.
+### VR Optimization Settings
 
-![Picture2](https://github.com/StoryLab-Research-Institute/pointcloudrenderer/assets/114744494/d4fdb8c1-b7a8-494f-aed0-21d54c080749)
+For Meta Quest 3, we recommend the following settings:
 
-Installation is complete, drag and drop your .PLY files into the project window.
+- **VR Optimization Level**: Medium
+- **Chunk Size**: 3-5 units
+- **CrossFade LODs**: Enabled
+- **Add VR Optimizer Component**: Enabled
 
-![Picture3](https://github.com/StoryLab-Research-Institute/pointcloudrenderer/assets/114744494/6603104c-aaf1-489d-9046-187e78fe2d05)
+For more complex point clouds or performance-sensitive applications:
 
-# Thanks
-The importing system is based on the PCX importer, used under the UnLicense: https://github.com/keijiro/Pcx 
+- **VR Optimization Level**: High or Extreme
+- **Chunk Size**: 2-3 units
+- **Initial Subsample Mode**: SpatialFast with minimum distance 0.01-0.05
+
+## Performance Tips for Meta Quest 3
+
+1. **Use the VR Point Cloud Optimizer component**
+   - This component automatically adjusts point cloud rendering based on current performance
+   - Use the "Balanced" preset as a starting point
+
+2. **Adjust chunk size carefully**
+   - Smaller chunks (2-5 units) work better for VR as they allow better culling
+   - Too many small chunks can increase draw calls, so find the right balance
+
+3. **Use LOD system effectively**
+   - Enable CrossFade for smoother transitions
+   - Configure more aggressive LOD transitions for distant objects
+
+4. **Use the mobile shader**
+   - The URP_Mobile shader is automatically used when "Optimize for VR" is enabled
+   - This shader avoids using geometry shaders which perform poorly on mobile GPUs
+
+5. **Batch point clouds by material**
+   - Use "Share Default" or "Custom" material mode for multiple point clouds to reduce draw calls
+
+## Known Issues
+
+- HDRP support is limited and not recommended for VR projects
+- Very large point clouds (>1 million points) may require aggressive optimization for Quest devices
+- Dynamic point clouds and runtime modifications are not fully optimized for VR performance
+
+## License
+
+This package uses the MIT License. See LICENSE.md for details.
+
+## Credits
+
+- Original PointCloudRenderer by StoryLab Research Institute
+- Updated for Unity 6 with VR optimization by Dataroomxyz
+- Based on PCX point cloud importer by Keijiro Takahashi
